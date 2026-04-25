@@ -2,8 +2,10 @@ from fastmcp import FastMCP
 import os
 import sqlite3
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "expenses.db")
-CATEGORIES_PATH = os.path.join(os.path.dirname(__file__), "categories.json")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH = os.path.join(BASE_DIR, "expenses.db")
+CATEGORIES_PATH = os.path.join(BASE_DIR, "categories.json")
 
 mcp = FastMCP("ExpenseTracker")
 
@@ -24,17 +26,15 @@ init_db()
 
 @mcp.tool()
 def add_expense(date, amount, category, subcategory="", note=""):
-    '''Add a new expense entry to the database.'''
     with sqlite3.connect(DB_PATH) as c:
         cur = c.execute(
             "INSERT INTO expenses(date, amount, category, subcategory, note) VALUES (?,?,?,?,?)",
             (date, amount, category, subcategory, note)
         )
         return {"status": "ok", "id": cur.lastrowid}
-    
+
 @mcp.tool()
 def list_expenses(start_date, end_date):
-    '''List expense entries within an inclusive date range.'''
     with sqlite3.connect(DB_PATH) as c:
         cur = c.execute(
             """
@@ -50,15 +50,12 @@ def list_expenses(start_date, end_date):
 
 @mcp.tool()
 def summarize(start_date, end_date, category=None):
-    '''Summarize expenses by category within an inclusive date range.'''
     with sqlite3.connect(DB_PATH) as c:
-        query = (
-            """
+        query = """
             SELECT category, SUM(amount) AS total_amount
             FROM expenses
             WHERE date BETWEEN ? AND ?
-            """
-        )
+        """
         params = [start_date, end_date]
 
         if category:
@@ -73,9 +70,11 @@ def summarize(start_date, end_date, category=None):
 
 @mcp.resource("expense://categories", mime_type="application/json")
 def categories():
-    # Read fresh each time so you can edit the file without restarting
     with open(CATEGORIES_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
+# ✅ IMPORTANT FIX HERE
 if __name__ == "__main__":
-    mcp.run()
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting server on port {port}")
+    mcp.run(host="0.0.0.0", port=port)
